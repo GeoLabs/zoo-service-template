@@ -97,61 +97,7 @@ class SimpleExecutionHandler(ExecutionHandler):
 
         logger.info("Post execution hook")
 
-        StacIO.set_default(CustomStacIO)
-
-        logger.info(f"Read catalog from STAC Catalog URI: {output['s3_catalog_output']}")
-
-        cat = read_file(output["s3_catalog_output"])
-
-        collection_id = self.get_additional_parameters()["sub_path"]
-
-        logger.info(f"Create collection with ID {collection_id}")
-
-        collection = None
-
-        collection = next(cat.get_all_collections())
-
-        logger.info("Got collection {collection.id} from processing outputs")
-        
-        items = []
-        
-        for item in collection.get_all_items():
-
-            logger.info("Processing item {item.id}")
-            
-            for asset_key in item.assets.keys():
-
-                logger.info(f"Processing asset {asset_key}")
-                
-                temp_asset = item.assets[asset_key].to_dict()
-                temp_asset["storage:platform"] = "eoap"
-                temp_asset["storage:requester_pays"] = False
-                temp_asset["storage:tier"] = "Standard"
-                temp_asset["storage:region"] = self.get_additional_parameters()[
-                    "region_name"
-                ]
-                temp_asset["storage:endpoint"] = self.get_additional_parameters()[
-                    "endpoint_url"
-                ]
-                item.assets[asset_key] = item.assets[asset_key].from_dict(temp_asset)
-            
-            item.collection_id = collection_id
-
-            items.append(item.clone())
-
-        item_collection = ItemCollection(items=items)
-
-        logger.info("Created feature collection from items")
-
-        # Trap the case of no output collection
-        if item_collection is None:
-            logger.error("The output collection is empty")
-            self.feature_collection = json.dumps({}, indent=2)
-            return
-
-        # Set the feature collection to be returned
-        self.results = item_collection.to_dict()
-        self.results["id"] = collection_id
+        return
 
     def get_pod_env_vars(self):
         # This method is used to set environment variables for the pod
@@ -205,9 +151,9 @@ class SimpleExecutionHandler(ExecutionHandler):
 
         try:
             logger.info("handle_outputs")
-
-            logger.info(f"Set output to {output['s3_catalog_output']}")
-            self.results = {"url": output["s3_catalog_output"]}
+            if output is not None:
+                logger.info(f"Set output to {output['s3_catalog_output']}")
+                self.results = {"url": output["s3_catalog_output"]}
 
             self.conf["main"]["tmpUrl"] = self.conf["main"]["tmpUrl"].replace(
                 "temp/", self.conf["auth_env"]["user"] + "/temp/"
