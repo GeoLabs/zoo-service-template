@@ -34,7 +34,7 @@ from pystac import read_file
 from pystac.stac_io import DefaultStacIO, StacIO
 from pystac.item_collection import ItemCollection
 from zoo_calrissian_runner import ExecutionHandler, ZooCalrissianRunner
-
+import yaml
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -89,15 +89,108 @@ class SimpleExecutionHandler(ExecutionHandler):
         self.results = None
 
     def pre_execution_hook(self):
+        # This method is invoked before execution starts.
+        # It is used to set up the additinal parameters based on specific criteria.
 
         logger.info("Pre execution hook")
 
-    def post_execution_hook(self, log, output, usage_report, tool_logs):
+        #
+        # Here you can patch the CWL file used for the stageout.
+        #
+        # For example, if you want to add a new parameter to the execution of the wrapped Application Package,
+        thematic_service_name = self.get_service_for_process()
+        self.conf["additional_parameters"]["thematic_service_name"] = thematic_service_name
 
-        # unset HTTP proxy or else the S3 client will use it and fail
-        os.environ.pop("HTTP_PROXY", None)
+        # In this example, you want to create a stageout.yaml file based on the service name,
+        # you can first load the stageout.yaml file from the assets directory.
+        stageout_yaml = yaml.safe_load(open("/assets/stageout.yaml","rb"))
+
+        # Depending on the thematic service name, you can update the stageout.yaml file.
+        # For example, if you want to import a specific Python file based on the thematic service name,
+        # you can do it like this (obviously, you can also add new code to the stageout):
+        entries = stageout_yaml["requirements"]["InitialWorkDirRequirement"]['listing']
+        entries[0]["entry"] += "\n" +\
+            "try:\n" +\
+            "    import my_service_indexing\n" +\
+            "except ImportError as e:\n" +\
+            "    print('error loading dynamic content: '+str(e),file=sys.stderr)\n"
+        #
+        # In the stageout.yaml file, we have put a dedicated [INIT_TEMPLATE] string for you to replace with your code.
+        # This is useful if you want to add new code to the intial phase of the stage.py file (which is the entry 0).
+        # In the example below, we are adding a new variable named thematic_service_name.
+        #
+        entries[0]["entry"] = entries[0]["entry"].replace(
+            "[INIT_TEMPLATE]",
+            "thematic_service_name=sys.argv[4]\n" +
+            "print(f\"thematic_service_name: {thematic_service_name}\", file=sys.stderr)"
+        )
+        # We are not doing it here, but you can also add new code to the stageout.yaml file.
+        #
+        # You can also add new Python file (or anythign else) to the stageout.yaml file.
+        #
+        # We can expect to have different Python files available for each thematic service name.
+        #
+        # We illustrate this with a simple example, only displaying an Hello string.
+        #
+        # In a real scenario, you should read a Python file dedicated to your thematic indexing.
+        #
+        # For example, if you have a file named my_service_indexing.py in the assets directory,
+        # you can add it to the stageout.yaml file by adding a new entry to the listing, i.e.:
+        # {
+        #   "entryname": "my_service_indexing.py",
+        #   "entry": open("/assets/my_service_indexing.py","rb").read().decode("utf-8")
+        # }
+        #
+        # In this example, you should add the new my_service_indexing.py file imported at the end of the .
+        #
+        entries.append(
+            {
+                "entryname": "my_service_indexing.py",
+                "entry": "import sys\n"+
+                    f"print('Hello from {thematic_service_name}',file=sys.stderr)\n"+
+                    "print(sys.argv,file=sys.stderr)"
+            }
+        )
+        # You can also add new input parameters.
+        stageout_yaml["inputs"]["thematic_service_name"]={"type": "string"}
+        # You can add arguments.
+        stageout_yaml["arguments"].append("$( inputs.thematic_service_name )")
+        # Yet another parameter to be passed to the wrapped Application Package.
+        self.conf["additional_parameters"]["my_new_parameter"] = "my-service-name"
+        #
+        # We don't use it here, but you can also overwrite the environment variables available from the stageout pod.
+        # i.e.:
+        # stageout_yaml["requirements"]["EnvVarRequirement"]["envDef"]["AWS_ACCESS_KEY_ID"] = "XXX"
+        # stageout_yaml["requirements"]["EnvVarRequirement"]["envDef"]["AWS_SECRET_ACCESS_KEY"] = "YYY"
+        # stageout_yaml["requirements"]["EnvVarRequirement"]["envDef"]["AWS_REGION"] = "ZZZ"
+        # You can reference an input parameter like this:
+        # stageout_yaml["requirements"]["EnvVarRequirement"]["envDef"]["AWS_S3_ENDPOINT"] = "$( inputs.endpoint_url )"
+        #
+        # Or add new ones:
+        # stageout_yaml["requirements"]["EnvVarRequirement"]["envDef"]["MY_NEW_ENV_VAR"] = "$( inputs.my_new_env_var )"
+        #
+        # Here we store the stageout.yaml file in the tmpPath directory.
+        #
+        self.stageout_file_path = f"/{self.conf['main']['tmpPath']}/stageout{self.conf['lenv']['usid']}.yaml"
+        stageout_file=open(self.stageout_file_path,"w")
+        yaml.dump(stageout_yaml,stageout_file)
+        stageout_file.close()
+        #
+        # Below we set the stageout.yaml file to be used to wrap the Application Package.
+        #
+        os.environ["WRAPPER_STAGE_OUT"] = self.stageout_file_path
+        #
+        # You can imagine having a dedicated stageout.yaml file for each thematic service name also.
+        # Then you can use the following:
+        # os.environ["WRAPPER_STAGE_OUT"] = f"/myPathToStageOuts/mystageOut{themactic_service_name}.yaml"
+        #
+
+    def post_execution_hook(self, log, output, usage_report, tool_logs):
+        # This method is invoked after execution ends.
+        # It is used to handle the output files of the execution.
 
         logger.info("Post execution hook")
+        os.remove(self.stageout_file_path)
 
         return
 
@@ -121,6 +214,24 @@ class SimpleExecutionHandler(ExecutionHandler):
 
         return node_selector
 
+    def get_service_for_process(self):
+        # This method is used to set the service name based on the process name.
+        processes_relationship = {
+            "my-service-name1": [
+                "process-name1",
+                "process-name2",
+            ],
+            "my-service-name2": [
+                "process-name3",
+                "process-name4",
+            ],
+        }
+        for i in processes_relationship:
+            if self.conf["lenv"]["Identifier"] in processes_relationship[i]:
+                return i
+        return "my-service-name"
+
+
     def get_additional_parameters(self):
         # sets the additional parameters for the execution
         # of the wrapped Application Package
@@ -130,6 +241,29 @@ class SimpleExecutionHandler(ExecutionHandler):
         additional_parameters = self.conf.get("additional_parameters", {})
 
         additional_parameters["sub_path"] = self.conf["lenv"]["usid"]
+
+        #
+        # From here you can overwrite the default additional parameters depending on the service.
+        # You can also add new additional parameters to the execution of the wrapped Application Package, like the service name.
+        #
+        # For example, if you want to add a new parameter to the execution of the wrapped Application Package,
+        # you can do it like this:
+        #
+        # additional_parameters["service_name"] = "MyServiceName"
+        # additional_parameters["thematic_service_name"] = "MyServiceName"
+        #
+        # If you want to overwrite an existing parameter, you can do it like this:
+        #
+        # additional_parameters["sub_path"] = "MyComputedPath"
+        #
+        # From your stageout.cwl, you can access the additional parameters.
+        #
+        # Here we will mimic selecting the service name based on the process name.
+        #
+        # additional_parameters["thematic_service_name"] = get_service_for_process(self)
+        # Here we wil finally set the service name based on the process identifier.
+        # additional_parameters["thematic_service_name"] = self.conf["lenv"]["Identifier"]
+        #
 
         logger.info(f"additional_parameters: {additional_parameters.keys()}")
 
@@ -192,6 +326,8 @@ class SimpleExecutionHandler(ExecutionHandler):
             raise (e)
 
     def get_secrets(self):
+        # This method is used to set the secrets for the pods
+        # spawned by calrissian.
         return {}
 
 
