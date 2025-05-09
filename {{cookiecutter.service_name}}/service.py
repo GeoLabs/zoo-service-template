@@ -151,11 +151,10 @@ class SimpleExecutionHandler(ExecutionHandler):
                     "print(sys.argv,file=sys.stderr)"
             }
         )
-        # You can also add new input parameters.
+        # You can also add new input parameters and passs it as an argument.
         stageout_yaml["inputs"]["thematic_service_name"]={"type": "string"}
-        # You can add arguments.
         stageout_yaml["arguments"].append("$( inputs.thematic_service_name )")
-        # Yet another parameter to be passed to the wrapped Application Package.
+        # Yet another input parameter to be passed to the wrapped Application Package.
         self.conf["additional_parameters"]["my_new_parameter"] = "my-service-name"
         #
         # We don't use it here, but you can also overwrite the environment variables available from the stageout pod.
