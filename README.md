@@ -80,6 +80,9 @@ subfolder: 3601c992-2cdf-11f0-9743-2e7049224aa9
 s3://results/3601c992-2cdf-11f0-9743-2e7049224aa9/catalog.json
 ````
 
+The production of a dynamic stageout is done in the [`pre_execution_hook` method](https://github.com/GeoLabs/zoo-service-template/blob/axis3-dynamic-stageout/%7B%7Bcookiecutter.service_name%7D%7D/service.py#L91-L185).
+
+
 
 
 
