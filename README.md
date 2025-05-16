@@ -14,6 +14,8 @@ It demonstrates how you can:
 To setup the solution, please use the commands below.
 
 ````
+helm repo add localstack https://helm.localstack.cloud
+helm repo add zoo-project https://zoo-project.github.io/charts/
 git clone -b axis3-skaffold https://github.com/GeoLabs/ZOO-Project.git
 cd ZOO-Project
 skaffold dev
