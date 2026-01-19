@@ -114,9 +114,7 @@ def {{cookiecutter.workflow_id |replace("-", "_")  }}(conf, inputs, outputs):  #
                 for i in range(len(keys)):
                     keys[i]+="_"+str(int(conf["service_logs"]["length"]))
             conf["service_logs"][keys[0]]=os.path.join(
-                conf['main']['tmpUrl'].replace(
-                    "temp/",conf["auth_env"]["user"]+"/temp/"
-                ),
+                conf['main']['tmpUrl'],
                 runner.get_namespace_name(),
                 "job.log"
             )
