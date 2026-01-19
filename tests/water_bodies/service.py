@@ -31,55 +31,19 @@ from botocore.client import Config
 from pystac import read_file
 from pystac.stac_io import DefaultStacIO, StacIO
 from pystac.item_collection import ItemCollection
-from zoo_calrissian_runner import ExecutionHandler, ZooCalrissianRunner
+from zoo_calrissian_runner import ZooCalrissianRunner
+from zoo_calrissian_runner.handlers import ExecutionHandler
+from zoo_template_common import CustomStacIO
 
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 
-class CustomStacIO(DefaultStacIO):
-    """Custom STAC IO class that uses boto3 to read from S3."""
-
-    def __init__(self):
-        self.session = botocore.session.Session()
-        self.s3_client = self.session.create_client(
-            service_name="s3",
-            region_name="us-east-1",
-            endpoint_url="http://eoap-zoo-project-localstack.eoap-zoo-project.svc.cluster.local:4566",
-            aws_access_key_id="test",
-            aws_secret_access_key="test",
-        )
-
-    def read_text(self, source, *args, **kwargs):
-        parsed = urlparse(source)
-        if parsed.scheme == "s3":
-            return (
-                self.s3_client.get_object(Bucket=parsed.netloc, Key=parsed.path[1:])[
-                    "Body"
-                ]
-                .read()
-                .decode("utf-8")
-            )
-        else:
-            return super().read_text(source, *args, **kwargs)
-
-    def write_text(self, dest, txt, *args, **kwargs):
-        parsed = urlparse(dest)
-        if parsed.scheme == "s3":
-            self.s3_client.put_object(
-                Body=txt.encode("UTF-8"),
-                Bucket=parsed.netloc,
-                Key=parsed.path[1:],
-                ContentType="application/geo+json",
-            )
-        else:
-            super().write_text(dest, txt, *args, **kwargs)
-
 StacIO.set_default(CustomStacIO)
 
 class SimpleExecutionHandler(ExecutionHandler):
-    def __init__(self, conf):
-        super().__init__()
+    def __init__(self, conf, outputs):
+        super().__init__(conf=conf, outputs=outputs)
         self.conf = conf
         self.results = None
 

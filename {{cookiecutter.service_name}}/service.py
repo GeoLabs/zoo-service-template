@@ -19,41 +19,14 @@ from pystac import read_file, Collection, Catalog
 from pystac.item_collection import ItemCollection
 from pystac.stac_io import StacIO
 from zoo_calrissian_runner import ZooCalrissianRunner
-from zoo_template_common import CommonExecutionHandler, CustomStacIO
+from zoo_calrissian_runner.handlers import ExecutionHandler
+from zoo_template_common import CustomStacIO
 
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 
 StacIO.set_default(CustomStacIO)
-
-
-class SimpleExecutionHandler(CommonExecutionHandler):
-    """Simple execution handler for basic ZOO workflows.
-    
-    Extends CommonExecutionHandler with specific storage platform configuration.
-    """
-
-    def __init__(self, conf, outputs):
-        super().__init__(conf, outputs)
-        self.job_id = None
-
-    def get_additional_parameters(self) -> Dict[str, str]:
-        """Get additional parameters with eoap storage platform."""
-        additional_parameters = super().get_additional_parameters()
-        additional_parameters["storage_platform"] = "eoap"
-        return additional_parameters
-
-    def set_job_id(self, job_id):
-        self.job_id = job_id
-
-    def get_namespace(self):
-        """Get the namespace for the execution."""
-        return os.environ.get("USE_NAMESPACE", None)
-
-    def get_service_account(self):
-        """Get the service account for the execution."""
-        return os.environ.get("USE_SERVICE_ACCOUNT", None)
 
 def {{cookiecutter.workflow_id |replace("-", "_")  }}(conf, inputs, outputs):  # noqa
 
@@ -67,7 +40,7 @@ def {{cookiecutter.workflow_id |replace("-", "_")  }}(conf, inputs, outputs):  #
         ) as stream:
             cwl = yaml.safe_load(stream)
 
-        execution_handler = SimpleExecutionHandler(conf=conf, outputs=outputs)
+        execution_handler = ExecutionHandler(conf=conf, outputs=outputs)
 
         runner = ZooCalrissianRunner(
             cwl=cwl,
