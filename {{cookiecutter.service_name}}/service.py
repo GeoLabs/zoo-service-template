@@ -36,6 +36,7 @@ class SimpleExecutionHandler(CommonExecutionHandler):
 
     def __init__(self, conf, outputs):
         super().__init__(conf, outputs)
+        self.job_id = None
 
     def get_additional_parameters(self) -> Dict[str, str]:
         """Get additional parameters with eoap storage platform."""
@@ -43,6 +44,16 @@ class SimpleExecutionHandler(CommonExecutionHandler):
         additional_parameters["storage_platform"] = "eoap"
         return additional_parameters
 
+    def set_job_id(self, job_id):
+        self.job_id = job_id
+
+    def get_namespace(self):
+        """Get the namespace for the execution."""
+        return os.environ.get("USE_NAMESPACE", None)
+
+    def get_service_account(self):
+        """Get the service account for the execution."""
+        return os.environ.get("USE_SERVICE_ACCOUNT", None)
 
 def {{cookiecutter.workflow_id |replace("-", "_")  }}(conf, inputs, outputs):  # noqa
 
