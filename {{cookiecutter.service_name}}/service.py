@@ -37,6 +37,7 @@ def {{cookiecutter.workflow_id |replace("-", "_")  }}(conf, inputs, outputs):  #
                 "app-package.cwl",
             ),
             "r",
+            encoding="utf-8"
         ) as stream:
             cwl = yaml.safe_load(stream)
 
